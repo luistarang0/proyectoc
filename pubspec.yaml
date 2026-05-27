@@ -1,0 +1,63 @@
+name: pr_c
+description: "Sistema de control de accesos para el ITT — GAMA Móvil."
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.11.1
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.8
+
+  # State management
+  flutter_riverpod: ^2.6.1
+
+  # UI / Fonts / Icons
+  google_fonts: ^6.2.1
+  font_awesome_flutter: ^10.7.0
+
+  # HTTP — cliente oficial para SAM (MPF §6.2)
+  dio: ^5.8.0
+
+  # Variables de entorno (MPF §8.1)
+  flutter_dotenv: ^5.2.1
+
+  # Conexión directa MySQL / Railway
+  mysql_client: ^0.0.27
+
+  # Generación de QR
+  qr_flutter: ^4.1.0
+
+  # Lectura de QR con cámara
+  mobile_scanner: ^5.2.3
+
+  # Generación de UUID para access_token
+  uuid: ^4.5.1
+
+  # Compartir QR como imagen
+  share_plus: ^10.1.4
+
+  # Directorio temporal para guardar QR antes de compartir
+  path_provider: ^2.1.5
+
+  # Lectura del número de teléfono del dispositivo (auth guardia)
+  sim_card_info: ^1.0.2
+
+  # Gestión de permisos en runtime
+  permission_handler: ^11.3.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - .env

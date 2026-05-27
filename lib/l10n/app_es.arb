@@ -1,0 +1,59 @@
+{
+  "@@locale": "es",
+  "@@last_modified": "2026-05-26",
+
+  "appTitle": "Control de Accesos",
+  "@appTitle": {
+    "description": "Título principal de la aplicación"
+  },
+
+  "loginButton": "Ingresar",
+  "@loginButton": {
+    "description": "Texto del botón de inicio de sesión"
+  },
+
+  "loginTitle": "Iniciar sesión",
+  "@loginTitle": {
+    "description": "Encabezado de la pantalla de login"
+  },
+
+  "loginSubtitle": "Ingresa tus credenciales institucionales",
+  "@loginSubtitle": {
+    "description": "Subtítulo de la pantalla de login"
+  },
+
+  "fieldUser": "Usuario",
+  "@fieldUser": {
+    "description": "Etiqueta del campo de usuario"
+  },
+
+  "fieldPassword": "Contraseña",
+  "@fieldPassword": {
+    "description": "Etiqueta del campo de contraseña"
+  },
+
+  "errorConnectionFailed": "Error de conexión. Intenta de nuevo.",
+  "@errorConnectionFailed": {
+    "description": "Mensaje de error cuando falla la conexión al servidor"
+  },
+
+  "errorInvalidCredentials": "Usuario o contraseña incorrectos",
+  "@errorInvalidCredentials": {
+    "description": "Mensaje de error para credenciales inválidas"
+  },
+
+  "semanticScanQr": "Escanear código QR",
+  "@semanticScanQr": {
+    "description": "Etiqueta semántica del ícono de escaneo QR"
+  },
+
+  "semanticLogout": "Cerrar sesión",
+  "@semanticLogout": {
+    "description": "Etiqueta semántica del botón de cierre de sesión"
+  },
+
+  "semanticNotifications": "Notificaciones",
+  "@semanticNotifications": {
+    "description": "Etiqueta semántica del ícono de notificaciones"
+  }
+}

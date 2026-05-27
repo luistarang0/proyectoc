@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\luist\\\\AndroidStudioProjects\\\\pr_c\" -Recurse -Force)",
+      "Bash(Select-Object FullName)",
+      "Bash(Sort-Object FullName)",
+      "Bash(python -c ' *)",
+      "Bash(python -c \"from pypdf import PdfReader; r = PdfReader\\(r'C:\\\\Users\\\\luist\\\\OneDrive\\\\8o Semestre\\\\AUDI TICS\\\\MPF-V1.0-2026-03-13.pdf'\\); print\\(len\\(r.pages\\), 'pages'\\); text = ''.join\\(p.extract_text\\(\\) for p in r.pages\\); print\\(text\\)\")",
+      "Bash(pip install *)",
+      "Bash(Get-ChildItem -Recurse -Path \"C:\\\\Users\\\\luist\\\\AndroidStudioProjects\\\\pr_c\\\\lib\" -Filter \"*.dart\")",
+      "Bash(flutter pub *)",
+      "Bash(flutter analyze *)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\luist\\\\Downloads\\\\sam_flutter\\\\sam_flutter\" -Recurse)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\luist\\\\Downloads\\\\rlwy\\\\rlwy_flutter\" -Recurse -Directory)",
+      "Bash(find \"C:\\\\Users\\\\luist\\\\Downloads\\\\rlwy\\\\rlwy_flutter\" -type f -name \"*.dart\" | head -30)",
+      "Bash(flutter devices *)",
+      "Bash(flutter run *)"
+    ]
+  }
+}
