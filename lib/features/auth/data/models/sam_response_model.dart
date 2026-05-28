@@ -102,8 +102,9 @@ class SamUserModel {
       correo: json['correo'] as String? ?? '',
       nombre: fullName,
       puesto: json['puesto'] as String? ?? '',
-      departamento: '',
-      edificio: '',
+      // SAM envía "departamento" (nombre del depto) y "edificio" (código: A, B…)
+      departamento: json['departamento'] as String? ?? '',
+      edificio: json['edificio'] as String? ?? '',
       credenciales: json['credenciales'] as String? ?? '',
       jefeSamId: parseIntField(json['jefe']),
       empleadoSamId: parseIntField(
@@ -159,6 +160,24 @@ class SamUserModel {
       puesto: '',
       departamento: '',
       edificio: '',
+    );
+  }
+
+  /// Reconstruye un [SamUserModel] desde el JSON producido por [toJson].
+  /// Usado para restaurar la sesión persistida en SharedPreferences.
+  factory SamUserModel.fromJson(Map<String, dynamic> json) {
+    return SamUserModel(
+      username: json['username'] as String? ?? '',
+      samRole: json['sam_role'] as String? ?? '',
+      correo: json['correo'] as String? ?? '',
+      nombre: json['nombre'] as String? ?? '',
+      puesto: json['puesto'] as String? ?? '',
+      departamento: json['departamento'] as String? ?? '',
+      edificio: json['edificio'] as String? ?? '',
+      sistemaUrl: json['sistema_url'] as String? ?? '',
+      jefeSamId: json['jefe_sam_id'] as int?,
+      empleadoSamId: json['empleado_sam_id'] as int?,
+      credenciales: json['credenciales'] as String? ?? '',
     );
   }
 

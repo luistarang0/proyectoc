@@ -1,13 +1,16 @@
 /// @file: anfitrion_solicitudes_viewmodel.dart
 /// @project: Control de Accesos - GAMA
 /// @description: ViewModel del tab "Mis Solicitudes" del Anfitrión.
-///   Carga el historial de solicitudes del anfitrión autenticado desde
-///   la BD usando findByHostWithDetails.
+///   Solo muestra solicitudes PENDIENTES o APROBADAS donde ningún visitante
+///   ha ingresado aún (antes de entradaInstitucion). Las canceladas/rechazadas
+///   se excluyen. Usa polling cada 10 s para reflejar cambios en tiempo real.
 /// @author: Luis Antonio Tarango Regis
-/// @version: 1.0.0
-/// @last_update: 2026-05-26
+/// @version: 1.1.0
+/// @last_update: 2026-05-28
 
 library;
+
+import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -54,12 +57,19 @@ class AnfitrionSolicitudesViewModel
     extends Notifier<AnfitrionSolicitudesState> {
   late final RequestRepository _repo;
   late final RequestItemRepository _itemRepo;
+  Timer? _pollTimer;
 
   @override
   AnfitrionSolicitudesState build() {
     _repo = ref.read(requestRepositoryProvider);
     _itemRepo = ref.read(requestItemRepositoryProvider);
     Future.microtask(_load);
+
+    // Polling cada 10 s para reflejar cambios en tiempo real:
+    // aprobación por el autorizador, entrada del visitante, etc.
+    _pollTimer = Timer.periodic(const Duration(seconds: 10), (_) => _load());
+    ref.onDispose(() => _pollTimer?.cancel());
+
     return const AnfitrionSolicitudesState(isLoading: true);
   }
 
@@ -73,20 +83,47 @@ class AnfitrionSolicitudesViewModel
       return;
     }
 
-    state = state.copyWith(isLoading: true, errorMsg: '');
+    // Primera carga: isLoading = true. Polls silenciosos: no cambiar isLoading
+    // para no mostrar el spinner en cada tick.
+    final isFirstLoad = state.solicitudes.isEmpty && !state.hasError;
+    if (isFirstLoad) state = state.copyWith(isLoading: true, errorMsg: '');
+
     try {
-      final data = await _repo.findByHostWithDetails(session.correo);
-      state = state.copyWith(isLoading: false, solicitudes: data);
+      // Rechazar solicitudes vencidas antes de cargar la lista.
+      await _autoRejectIfNeeded();
+
+      // Solo PENDIENTE y APROBADA sin entrada registrada.
+      final data = await _repo.findSolicitudesAnfitrion(session.correo);
+      state = state.copyWith(isLoading: false, errorMsg: '', solicitudes: data);
     } catch (e) {
       debugPrint('[AnfitrionSolicitudesVM] Error: $e');
-      state = state.copyWith(
-        isLoading: false,
-        errorMsg: 'Error al cargar solicitudes. Intenta de nuevo.',
-      );
+      // Solo mostrar error en primera carga; silenciar fallos de poll.
+      if (isFirstLoad) {
+        state = state.copyWith(
+          isLoading: false,
+          errorMsg: 'Error al cargar solicitudes. Intenta de nuevo.',
+        );
+      }
     }
   }
 
   Future<void> refresh() => _load();
+
+  // ── Cierre automático ─────────────────────────────────────────────────────
+
+  /// Ejecuta las reglas de cierre antes de cada carga:
+  ///   1. Rechaza solicitudes cuyo scheduled_time + tolerance ya pasó.
+  ///   2. Si son las 21:00 o más, rechaza todo lo que quede pendiente del día.
+  Future<void> _autoRejectIfNeeded() async {
+    try {
+      await _repo.autoRejectExpired();
+      if (DateTime.now().hour >= 21) {
+        await _repo.autoRejectAllPending();
+      }
+    } catch (e) {
+      debugPrint('[AnfitrionSolicitudesVM] autoReject error: $e');
+    }
+  }
 
   // ── Cancelar solicitud ────────────────────────────────────────────────────
 
@@ -101,7 +138,8 @@ class AnfitrionSolicitudesViewModel
       if (tieneEntrada) {
         state = state.copyWith(
           isLoading: false,
-          errorMsg: 'No se puede cancelar: el visitante ya ingresó al instituto.',
+          errorMsg:
+              'No se puede cancelar: el visitante ya ingresó al instituto.',
         );
         return false;
       }

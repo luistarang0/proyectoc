@@ -21,6 +21,7 @@ import '../../../../core/config/app_spacing.dart';
 import '../../../../core/config/app_text_styles.dart';
 import '../../../../core/widgets/app_text_field.dart';
 import '../../../../core/widgets/empty_state.dart';
+import '../../../../core/widgets/home_shell.dart';
 import '../../../../core/widgets/primary_button.dart';
 import '../../../../core/utils/logout.dart';
 import '../../data/models/request_db_model.dart';
@@ -95,21 +96,35 @@ extension _RequestStatusAnfitrionExt on RequestStatus {
 ///   1 — Mis visitantes
 ///   2 — Nueva solicitud
 ///   3 — Perfil
-class HomeAnfitrionView extends StatefulWidget {
+class HomeAnfitrionView extends ConsumerStatefulWidget {
   const HomeAnfitrionView({super.key});
 
   @override
-  State<HomeAnfitrionView> createState() => _HomeAnfitrionViewState();
+  ConsumerState<HomeAnfitrionView> createState() => _HomeAnfitrionViewState();
 }
 
-class _HomeAnfitrionViewState extends State<HomeAnfitrionView> {
+class _HomeAnfitrionViewState extends ConsumerState<HomeAnfitrionView> {
   int _selectedIndex = 0;
 
   @override
+  void initState() {
+    super.initState();
+    // Recargar siempre al montar: garantiza datos frescos tras login/logout.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        ref.read(anfitrionSolicitudesViewModelProvider.notifier).refresh();
+        ref.read(anfitrionVisitantesViewModelProvider.notifier).refresh();
+      }
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return HomeShell(
+      child: Scaffold(
       backgroundColor: AppColors.appBackground,
       appBar: AppBar(
+        automaticallyImplyLeading: false, // sin flecha de retroceso
         title: const Text('Panel de Anfitrión'),
         actions: [
           IconButton(
@@ -169,6 +184,7 @@ class _HomeAnfitrionViewState extends State<HomeAnfitrionView> {
           ),
         ],
       ),
+    ),
     );
   }
 }
@@ -1668,17 +1684,11 @@ class _TabPerfil extends ConsumerWidget {
                   _ProfileRow(icon: AppIcons.email, label: session!.correo),
                   const Divider(height: AppSpacing.blockGap),
                 ],
-                if (session?.departamento.isNotEmpty == true) ...[
+                if (session?.departamento.isNotEmpty == true)
                   _ProfileRow(
                     icon: AppIcons.building,
                     label: session!.departamento,
                   ),
-                  const Divider(height: AppSpacing.blockGap),
-                ],
-                _ProfileRow(
-                  icon: AppIcons.guardia,
-                  label: 'Edificio: ${session?.edificio.isNotEmpty == true ? session!.edificio : "—"}',
-                ),
               ],
             ),
           ),

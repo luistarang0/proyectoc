@@ -122,6 +122,13 @@ class NuevaSolicitudViewModel extends Notifier<NuevaSolicitudState> {
       return;
     }
 
+    // ── Validación de ventana horaria institucional (07:00–19:00) ────────────
+    final timeError = _validateTimeWindow(scheduledTime, toleranceMinutes);
+    if (timeError != null) {
+      state = state.copyWith(errorMsg: timeError);
+      return;
+    }
+
     state = state.copyWith(
       isSubmitting: true,
       errorMsg: '',
@@ -197,6 +204,53 @@ class NuevaSolicitudViewModel extends Notifier<NuevaSolicitudState> {
   /// Resetea el flag de éxito para reutilizar el formulario.
   void resetSuccess() {
     state = state.copyWith(submitSuccess: false);
+  }
+
+  // ── Validación de ventana horaria ─────────────────────────────────────────
+
+  /// Verifica que la visita quepa dentro del horario institucional 07:00–19:00,
+  /// considerando la tolerancia (± [toleranceMinutes]).
+  ///
+  /// Retorna un mensaje de error si la validación falla, o `null` si es válido.
+  String? _validateTimeWindow(String scheduledTime, int toleranceMinutes) {
+    // Parsear 'HH:MM:SS' o 'HH:MM'.
+    final parts = scheduledTime.split(':');
+    if (parts.length < 2) return 'Formato de hora inválido.';
+
+    final h = int.tryParse(parts[0]) ?? -1;
+    final m = int.tryParse(parts[1]) ?? -1;
+    if (h < 0 || m < 0) return 'Formato de hora inválido.';
+
+    // Convertir todo a minutos desde medianoche.
+    final scheduledMin = h * 60 + m;
+    const openMin = 7 * 60;   // 07:00
+    const closeMin = 19 * 60; // 19:00
+
+    final earliestMin = scheduledMin - toleranceMinutes;
+    final latestMin   = scheduledMin + toleranceMinutes;
+
+    if (earliestMin < openMin) {
+      final earliest = _fmtMin(earliestMin);
+      return 'Con tolerancia de ${toleranceMinutes}min, la ventana de llegada '
+          'empieza a las $earliest, antes de la apertura institucional (07:00).\n'
+          'Elige una hora igual o posterior a las 07:${toleranceMinutes.toString().padLeft(2, '0')}.';
+    }
+
+    if (latestMin > closeMin) {
+      final latest = _fmtMin(latestMin);
+      return 'Con tolerancia de ${toleranceMinutes}min, la ventana de llegada '
+          'termina a las $latest, después del cierre institucional (19:00).\n'
+          'Elige una hora igual o anterior a las ${_fmtMin(closeMin - toleranceMinutes)}.';
+    }
+
+    return null; // válido
+  }
+
+  /// Formatea minutos desde medianoche como 'HH:MM'.
+  String _fmtMin(int totalMinutes) {
+    final h = (totalMinutes ~/ 60).clamp(0, 23).toString().padLeft(2, '0');
+    final m = (totalMinutes % 60).clamp(0, 59).toString().padLeft(2, '0');
+    return '$h:$m';
   }
 }
 

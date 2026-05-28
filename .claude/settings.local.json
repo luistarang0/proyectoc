@@ -14,7 +14,10 @@
       "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\luist\\\\Downloads\\\\rlwy\\\\rlwy_flutter\" -Recurse -Directory)",
       "Bash(find \"C:\\\\Users\\\\luist\\\\Downloads\\\\rlwy\\\\rlwy_flutter\" -type f -name \"*.dart\" | head -30)",
       "Bash(flutter devices *)",
-      "Bash(flutter run *)"
+      "Bash(flutter run *)",
+      "Bash(findstr sim_card)",
+      "Bash(dir /s /b \"%LOCALAPPDATA%\\\\Pub\\\\Cache\\\\hosted\\\\pub.dev\\\\sim_card_info*\")",
+      "Bash(findstr \"\\\\.dart$\")"
     ]
   }
 }

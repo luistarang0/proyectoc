@@ -42,7 +42,9 @@ class SamAuthService {
   /// Descarga la imagen CAPTCHA e inicializa la cookie JSESSIONID.
   Future<Uint8List> fetchCaptcha() async {
     try {
-      debugPrint('[SAM] GET captcha | sesión previa: ${_httpService.hasSession}');
+      debugPrint(
+        '[SAM] GET captcha | sesión previa: ${_httpService.hasSession}',
+      );
       final response = await _dio.get<List<int>>(
         _captchaPath,
         options: Options(responseType: ResponseType.bytes),
@@ -51,7 +53,9 @@ class SamAuthService {
         throw const SamAuthException('No se pudo cargar el CAPTCHA');
       }
       final bytes = Uint8List.fromList(response.data!);
-      debugPrint('[SAM] Captcha: ${bytes.length} bytes | sesión: ${_httpService.hasSession}');
+      debugPrint(
+        '[SAM] Captcha: ${bytes.length} bytes | sesión: ${_httpService.hasSession}',
+      );
       return bytes;
     } on DioException catch (e) {
       debugPrint('[SAM][ERROR] fetchCaptcha: ${e.type} ${e.message}');
@@ -62,7 +66,9 @@ class SamAuthService {
   /// Valida el código CAPTCHA ingresado por el usuario.
   Future<bool> validateCaptcha(String captchaCode) async {
     try {
-      debugPrint('[SAM] POST validarCaptcha | cookie=${_httpService.hasSession} | captcha="$captchaCode"');
+      debugPrint(
+        '[SAM] POST validarCaptcha | cookie=${_httpService.hasSession} | captcha="$captchaCode"',
+      );
       final response = await _dio.post<String>(
         _validateCaptchaPath,
         data: 'inpCaptcha=${Uri.encodeComponent(captchaCode)}',
@@ -91,10 +97,13 @@ class SamAuthService {
     String captchaCode,
   ) async {
     try {
-      debugPrint('[SAM] POST login | user="$username" | cookie=${_httpService.hasSession}');
+      debugPrint(
+        '[SAM] POST login | user="$username" | cookie=${_httpService.hasSession}',
+      );
       final response = await _dio.post<String>(
         _loginPath,
-        data: 'itt_username=${Uri.encodeComponent(username)}'
+        data:
+            'itt_username=${Uri.encodeComponent(username)}'
             '&itt_password=${Uri.encodeComponent(password)}'
             '&inpCaptcha=${Uri.encodeComponent(captchaCode)}',
         options: Options(
@@ -123,9 +132,7 @@ class SamAuthService {
       debugPrint('[SAM] GET $_perfilPath | cookie=${_httpService.hasSession}');
       final response = await _dio.get<dynamic>(
         _perfilPath,
-        options: Options(
-          responseType: ResponseType.plain,
-        ),
+        options: Options(responseType: ResponseType.plain),
       );
 
       debugPrint('[SAM] Perfil raw: ${response.data}');
@@ -137,7 +144,9 @@ class SamAuthService {
       } else if (raw is String) {
         data = _parseJson(raw);
       } else {
-        throw const SamAuthException('Formato inesperado en respuesta de perfil');
+        throw const SamAuthException(
+          'Formato inesperado en respuesta de perfil',
+        );
       }
 
       final status = data['status'];
@@ -152,6 +161,8 @@ class SamAuthService {
         'nombre: "${model.nombre}" | '
         'credenciales: "${model.credenciales}" | '
         'correo: "${model.correo}" | '
+        'departamento: "${model.departamento}" | '
+        'edificio: "${model.edificio}" | '
         'jefe: ${model.jefeSamId} | '
         'id_empleado: ${model.empleadoSamId}',
       );
@@ -168,7 +179,10 @@ class SamAuthService {
   /// Cierra la sesión en el servidor SAM y limpia la cookie local.
   Future<void> logout() async {
     try {
-      await _dio.get(_logoutPath, options: Options(validateStatus: (_) => true));
+      await _dio.get(
+        _logoutPath,
+        options: Options(validateStatus: (_) => true),
+      );
     } finally {
       _httpService.clearSession();
     }

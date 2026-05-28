@@ -90,10 +90,13 @@ class AnfitrionVisitantesViewModel
     _logRepo = ref.read(accessLogRepositoryProvider);
     _requestRepo = ref.read(requestRepositoryProvider);
     Future.microtask(_load);
-    // Polling de extensiones cada 10 segundos mientras la tab está activa.
+    // Polling cada 10 s: actualiza visitantes Y extensiones pendientes.
     _extensionPollTimer = Timer.periodic(
       const Duration(seconds: 10),
-      (_) => _pollExtensions(),
+      (_) async {
+        await _pollExtensions();
+        await _loadSilent();
+      },
     );
     ref.onDispose(() => _extensionPollTimer?.cancel());
     return const AnfitrionVisitantesState(isLoading: true);
@@ -126,6 +129,19 @@ class AnfitrionVisitantesViewModel
         errorMsg: 'Error al cargar visitantes. Intenta de nuevo.',
       );
     }
+  }
+
+  /// Recarga silenciosa (sin spinner) usada por el timer de polling.
+  Future<void> _loadSilent() async {
+    final session = ref.read(sessionProvider);
+    if (session == null) return;
+    try {
+      final data = await _logRepo.getActiveVisitsForHost(
+        session.correo,
+        DateTime.now(),
+      );
+      state = state.copyWith(visitantes: data);
+    } catch (_) {}
   }
 
   // ── Acciones ──────────────────────────────────────────────────────────────

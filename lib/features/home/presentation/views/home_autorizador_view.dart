@@ -15,6 +15,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 
 import '../../../../core/utils/logout.dart';
+import '../../../../core/widgets/home_shell.dart';
 
 import '../../../../core/config/app_colors.dart';
 import '../../../../core/config/app_icons.dart';
@@ -71,12 +72,25 @@ class _HomeAutorizadorViewState extends ConsumerState<HomeAutorizadorView> {
   int _selectedIndex = 0;
 
   @override
+  void initState() {
+    super.initState();
+    // Recargar siempre al montar: garantiza datos frescos tras login/logout.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        ref.read(autorizadorViewModelProvider.notifier).refresh();
+      }
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     final vm = ref.watch(autorizadorViewModelProvider);
 
-    return Scaffold(
+    return HomeShell(
+      child: Scaffold(
       backgroundColor: AppColors.appBackground,
       appBar: AppBar(
+        automaticallyImplyLeading: false,
         title: const Text('Panel Autorizador'),
         actions: [
           // Badge de pendientes.
@@ -127,10 +141,7 @@ class _HomeAutorizadorViewState extends ConsumerState<HomeAutorizadorView> {
           : IndexedStack(
               index: _selectedIndex,
               children: [
-                _TabPendientes(
-                  items: vm.pending,
-                  isProcessing: vm.isProcessing,
-                ),
+                _TabPendientes(items: vm.pending),
                 _TabHistorial(
                   items: vm.approved,
                   titulo: 'Solicitudes aprobadas',
@@ -167,6 +178,7 @@ class _HomeAutorizadorViewState extends ConsumerState<HomeAutorizadorView> {
           ),
         ],
       ),
+    ),
     );
   }
 }
@@ -177,13 +189,17 @@ class _HomeAutorizadorViewState extends ConsumerState<HomeAutorizadorView> {
 
 /// Tab que lista solicitudes pendientes con acciones de aprobar/rechazar.
 class _TabPendientes extends ConsumerWidget {
-  const _TabPendientes({required this.items, required this.isProcessing});
+  const _TabPendientes({required this.items});
 
   final List<RequestSummaryDto> items;
-  final bool isProcessing;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Suscribir solo al processingRequestId para no redibujar todo en cada poll.
+    final processingId = ref.watch(
+      autorizadorViewModelProvider.select((s) => s.processingRequestId),
+    );
+
     if (items.isEmpty) {
       return const EmptyState(
         icon: AppIcons.circleCheck,
@@ -205,15 +221,22 @@ class _TabPendientes extends ConsumerWidget {
             badgeColor: AppColors.warning,
           );
         }
+        final item = items[i - 1];
+        // Solo la tarjeta de ESTA solicitud muestra el spinner.
+        final isThisProcessing = processingId == item.requestId;
         return _SolicitudCard(
-          data: items[i - 1],
-          isProcessing: isProcessing,
-          onAprobar: () => ref
-              .read(autorizadorViewModelProvider.notifier)
-              .approve(items[i - 1].requestId),
-          onRechazar: () => ref
-              .read(autorizadorViewModelProvider.notifier)
-              .reject(items[i - 1].requestId),
+          data: item,
+          isProcessing: isThisProcessing,
+          onAprobar: isThisProcessing
+              ? null
+              : () => ref
+                    .read(autorizadorViewModelProvider.notifier)
+                    .approve(item.requestId),
+          onRechazar: isThisProcessing
+              ? null
+              : () => ref
+                    .read(autorizadorViewModelProvider.notifier)
+                    .reject(item.requestId),
         );
       },
     );

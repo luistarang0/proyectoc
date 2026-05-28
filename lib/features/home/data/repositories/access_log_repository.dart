@@ -84,7 +84,8 @@ class AccessLogRepository {
              ri.item_id, ri.request_id, ri.visitor_id,
              ri.access_token, ri.created_at,
              v.full_name, v.email,
-             r.building_id, r.scheduled_time, r.Email_Host, r.visit_type,
+             r.building_id, r.scheduled_time, r.tolerance_minutes,
+             r.Email_Host, r.visit_type,
              b.building_name
            FROM requests_items ri
            JOIN requests r ON r.request_id = ri.request_id
@@ -120,6 +121,9 @@ class AccessLogRepository {
           visitor: visitor,
           lastLog: lastLog,
           scheduledTime: map['scheduled_time'],
+          toleranceMinutes: map['tolerance_minutes'] != null
+              ? int.tryParse(map['tolerance_minutes']!)
+              : null,
           visitType: map['visit_type'] != null
               ? VisitTypeDb.fromDbValue(map['visit_type']!)
               : null,
@@ -176,6 +180,9 @@ class AccessLogRepository {
           visitor: visitor,
           lastLog: lastLog,
           scheduledTime: map['scheduled_time'],
+          toleranceMinutes: map['tolerance_minutes'] != null
+              ? int.tryParse(map['tolerance_minutes']!)
+              : null,
           visitType: map['visit_type'] != null
               ? VisitTypeDb.fromDbValue(map['visit_type']!)
               : null,
@@ -195,6 +202,7 @@ class ActiveVisitDto {
     required this.visitor,
     this.lastLog,
     this.scheduledTime,
+    this.toleranceMinutes,
     this.visitType,
     this.buildingName,
   });
@@ -207,6 +215,9 @@ class ActiveVisitDto {
 
   /// Hora programada de la visita en formato 'HH:MM:SS' (de requests).
   final String? scheduledTime;
+
+  /// Minutos de tolerancia configurados en la solicitud.
+  final int? toleranceMinutes;
 
   /// Tipo de visita — permite identificar espontáneas en el panel del guardia.
   final VisitTypeDb? visitType;

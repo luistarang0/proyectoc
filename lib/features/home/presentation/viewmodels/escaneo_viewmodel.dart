@@ -23,7 +23,16 @@ import '../../data/repositories/request_repository.dart';
 
 // ── Resultado del escaneo ─────────────────────────────────────────────────────
 
-enum ScanAction { entrada, salida, extensionPendiente }
+enum ScanAction {
+  entrada,
+  salida,
+
+  /// El visitante está en el instituto pero no pasó por la oficina (o aún está
+  /// en ella). Se pide confirmación antes de registrar la salida.
+  salidaSinOficina,
+
+  extensionPendiente,
+}
 
 /// Resultado completo de procesar un token QR.
 class ScanResult {
@@ -88,6 +97,22 @@ class ScanResult {
     action: ScanAction.entrada,
     errorMessage: message,
   );
+
+  /// El visitante entró al instituto pero nunca llegó a la oficina del anfitrión
+  /// (o aún está en ella). El guardia debe confirmar que desea registrar la
+  /// salida sin el ciclo oficina completo.
+  factory ScanResult.salidaSinOficina({
+    required String visitorName,
+    required int itemId,
+    required String message,
+  }) =>
+      ScanResult(
+        isSuccess: false,
+        action: ScanAction.salidaSinOficina,
+        visitorName: visitorName,
+        itemId: itemId,
+        errorMessage: message,
+      );
 
   factory ScanResult.fueraDeHorario({
     required String visitorName,
@@ -217,10 +242,14 @@ class EscaneoViewModel extends Notifier<EscaneoState> {
       }
 
       final lastEvent = lastLog?.eventType;
+
+      // ── Caso 1: visita ya cerrada ─────────────────────────────────────────
       if (lastEvent == AccessEventType.salidaInstitucion) {
-        _setError('Visita ya finalizada'); return;
+        _setError('Visita ya finalizada');
+        return;
       }
 
+      // ── Caso 2: primera entrada ───────────────────────────────────────────
       if (isFirstEntry) {
         await _logRepo.create(AccessLogDbModel(
           itemId: details.itemId,
@@ -233,7 +262,11 @@ class EscaneoViewModel extends Notifier<EscaneoState> {
             emailHost: details.emailHost,
           ),
         );
-      } else {
+        return;
+      }
+
+      // ── Caso 3: salida normal (el anfitrión ya confirmó salidaOficina) ────
+      if (lastEvent == AccessEventType.salidaOficina) {
         await _logRepo.create(AccessLogDbModel(
           itemId: details.itemId,
           eventType: AccessEventType.salidaInstitucion,
@@ -241,10 +274,52 @@ class EscaneoViewModel extends Notifier<EscaneoState> {
         state = EscaneoState(
           lastScan: ScanResult.salida(visitorName: details.visitorName),
         );
+        return;
       }
+
+      // ── Caso 4: el visitante está en el instituto pero sin ciclo de oficina
+      //   completo (entradaInstitucion o llegadaOficina sin salidaOficina).
+      //   Pedir confirmación al guardia antes de registrar la salida.
+      final message = lastEvent == AccessEventType.llegadaOficina
+          ? 'El visitante aún está registrado en la oficina del anfitrión.\n'
+              '¿Registrar salida del instituto de todos modos?'
+          : 'El visitante nunca llegó a la oficina del anfitrión.\n'
+              '¿Registrar salida del instituto de todos modos?';
+
+      state = EscaneoState(
+        lastScan: ScanResult.salidaSinOficina(
+          visitorName: details.visitorName,
+          itemId: details.itemId,
+          message: message,
+        ),
+      );
     } catch (e) {
       debugPrint('[EscaneoVM] Error: $e');
       _setError('Error de conexión. Intenta de nuevo.');
+    }
+  }
+
+  // ── Salida directa sin ciclo de oficina ──────────────────────────────────
+
+  /// Registra [salidaInstitucion] después de que el guardia confirmó que el
+  /// visitante sale sin haber completado el ciclo de oficina.
+  Future<void> confirmarSalidaDirecta(int itemId) async {
+    state = const EscaneoState(isProcessing: true);
+    try {
+      await _logRepo.create(
+        AccessLogDbModel(
+          itemId: itemId,
+          eventType: AccessEventType.salidaInstitucion,
+        ),
+      );
+      // Obtener el nombre del visitante desde el último resultado para mostrarlo.
+      final visitorName = state.lastScan?.visitorName ?? '—';
+      state = EscaneoState(
+        lastScan: ScanResult.salida(visitorName: visitorName),
+      );
+    } catch (e) {
+      debugPrint('[EscaneoVM] Error confirmando salida directa: $e');
+      _setError('Error al registrar la salida. Intenta de nuevo.');
     }
   }
 

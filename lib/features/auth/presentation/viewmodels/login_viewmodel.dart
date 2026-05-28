@@ -16,6 +16,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/services/sam_departamento_service.dart';
+import '../../../../core/services/session_storage_service.dart';
 import '../../data/data.dart';
 import '../../model/auth_models.dart';
 import '../providers/session_provider.dart';
@@ -170,6 +171,9 @@ class LoginViewModel extends Notifier<LoginState> {
       if (!context.mounted) return;
       // Persistir perfil SAM en sesión para toda la app.
       ref.read(sessionProvider.notifier).state = result.user;
+
+      // Guardar sesión en almacenamiento local para persistencia entre reinicios.
+      SessionStorageService.saveSamSession(result.user).ignore();
 
       // Cargar en caché el mapa edificio→correoPuesto desde SAM.
       // No bloqueamos la navegación si falla.

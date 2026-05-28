@@ -16,6 +16,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../features/auth/data/services/sam_auth_service.dart';
 import '../../features/auth/model/guardia_session.dart';
 import '../../features/auth/presentation/providers/session_provider.dart';
+import '../services/session_storage_service.dart';
 
 /// Cierra la sesión activa y navega al login.
 ///
@@ -33,9 +34,10 @@ Future<void> logoutUser(WidgetRef ref, BuildContext context) async {
     }
   }
 
-  // 2. Limpiar sesiones.
+  // 2. Limpiar sesiones en memoria y en almacenamiento local.
   ref.read(sessionProvider.notifier).state = null;
   ref.read(guardiaSessionProvider.notifier).state = null;
+  await SessionStorageService.clearAll();
 
   // 3. No invalidamos loginViewModelProvider aquí para evitar
   //    LateInitializationError al reinicializar dentro de un ciclo activo.

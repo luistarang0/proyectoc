@@ -20,6 +20,7 @@ import '../../../../core/config/app_spacing.dart';
 import '../../../../core/config/app_text_styles.dart';
 import '../../../../core/widgets/app_text_field.dart';
 import '../../../../core/widgets/empty_state.dart';
+import '../../../../core/widgets/home_shell.dart';
 import '../../../../core/widgets/primary_button.dart';
 import '../../data/models/access_log_db_model.dart';
 import '../../data/models/building_model.dart';
@@ -51,46 +52,47 @@ class _HomeGuardiaViewState extends State<HomeGuardiaView> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.appBackground,
-      appBar: AppBar(
-        title: const Text('Control de Accesos'),
-        actions: [
-          IconButton(
-            icon: const FaIcon(FontAwesomeIcons.bell, size: 18),
-            onPressed: () {},
-            tooltip: 'Notificaciones',
-          ),
-          const LogoutButton(),
-        ],
-      ),
-
-      body: IndexedStack(
-        index: _selectedIndex,
-        children: const [
-          _TabEscaneoQR(), // 0
-          _TabRegistroManual(), // 1
-          _TabVisitasActivas(), // 2
-        ],
-      ),
-
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _selectedIndex,
-        onTap: (i) => setState(() => _selectedIndex = i),
-        items: const [
-          BottomNavigationBarItem(
-            icon: FaIcon(FontAwesomeIcons.qrcode, size: 18),
-            label: 'Escaneo',
-          ),
-          BottomNavigationBarItem(
-            icon: FaIcon(FontAwesomeIcons.hashtag, size: 18),
-            label: 'Manual',
-          ),
-          BottomNavigationBarItem(
-            icon: FaIcon(FontAwesomeIcons.listCheck, size: 18),
-            label: 'Visitas',
-          ),
-        ],
+    return HomeShell(
+      child: Scaffold(
+        backgroundColor: AppColors.appBackground,
+        appBar: AppBar(
+          automaticallyImplyLeading: false,
+          title: const Text('Control de Accesos'),
+          actions: [
+            IconButton(
+              icon: const FaIcon(FontAwesomeIcons.bell, size: 18),
+              onPressed: () {},
+              tooltip: 'Notificaciones',
+            ),
+            const LogoutButton(),
+          ],
+        ),
+        body: IndexedStack(
+          index: _selectedIndex,
+          children: const [
+            _TabEscaneoQR(), // 0
+            _TabRegistroManual(), // 1
+            _TabVisitasActivas(), // 2
+          ],
+        ),
+        bottomNavigationBar: BottomNavigationBar(
+          currentIndex: _selectedIndex,
+          onTap: (i) => setState(() => _selectedIndex = i),
+          items: const [
+            BottomNavigationBarItem(
+              icon: FaIcon(FontAwesomeIcons.qrcode, size: 18),
+              label: 'Escaneo',
+            ),
+            BottomNavigationBarItem(
+              icon: FaIcon(FontAwesomeIcons.hashtag, size: 18),
+              label: 'Manual',
+            ),
+            BottomNavigationBarItem(
+              icon: FaIcon(FontAwesomeIcons.listCheck, size: 18),
+              label: 'Visitas',
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -153,10 +155,11 @@ class _TabEscaneoQRState extends ConsumerState<_TabEscaneoQR> {
   Future<void> _showResultSheet(BuildContext context, ScanResult result) async {
     _scannerController.stop();
     final isExtension = result.action == ScanAction.extensionPendiente;
+    final isSalidaSinOficina = result.action == ScanAction.salidaSinOficina;
     await showModalBottomSheet<void>(
       context: context,
       isDismissible: !isExtension,
-      enableDrag: !isExtension,
+      enableDrag: !isExtension && !isSalidaSinOficina,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -486,9 +489,22 @@ class _ScanResultSheet extends ConsumerWidget {
       });
     }
 
-    // Mostrar variante de espera.
+    // Si la salida sin oficina fue confirmada (→ acción cambió a salida), cerrar.
+    if (result.action == ScanAction.salidaSinOficina &&
+        current.action == ScanAction.salida) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (context.mounted) Navigator.pop(context);
+      });
+    }
+
+    // Mostrar variante de espera de extensión.
     if (current.action == ScanAction.extensionPendiente) {
       return _buildExtensionWaiting(context, ref, current);
+    }
+
+    // Mostrar variante de confirmación de salida sin ciclo de oficina.
+    if (current.action == ScanAction.salidaSinOficina) {
+      return _buildSalidaSinOficina(context, ref, current);
     }
 
     final bool isEntrada =
@@ -652,6 +668,133 @@ class _ScanResultSheet extends ConsumerWidget {
                 ),
               ),
             ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── Variante: Salida sin ciclo de oficina completo ───────────────────────
+
+  Widget _buildSalidaSinOficina(
+    BuildContext context,
+    WidgetRef ref,
+    ScanResult current,
+  ) {
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(
+          AppSpacing.screenH,
+          AppSpacing.md,
+          AppSpacing.screenH,
+          AppSpacing.xl,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Indicador de arrastre.
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: AppColors.borderGray,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: AppSpacing.blockGap),
+
+            // Ícono de advertencia.
+            Container(
+              width: 72,
+              height: 72,
+              decoration: BoxDecoration(
+                color: AppColors.warning.withValues(alpha: 0.1),
+                shape: BoxShape.circle,
+              ),
+              child: const Center(
+                child: FaIcon(
+                  AppIcons.circleInfo,
+                  size: 32,
+                  color: AppColors.warning,
+                ),
+              ),
+            ),
+            const SizedBox(height: AppSpacing.md),
+
+            Text(
+              'Confirmar salida',
+              style: AppTextStyles.title.copyWith(color: AppColors.warning),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              current.visitorName ?? '—',
+              style: AppTextStyles.subtitle,
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            Text(
+              current.errorMessage ?? '',
+              style: AppTextStyles.body.copyWith(color: AppColors.textContrast),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: AppSpacing.blockGap),
+
+            // Botón confirmar salida.
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: current.itemId == null
+                    ? null
+                    : () => ref
+                          .read(escaneoViewModelProvider.notifier)
+                          .confirmarSalidaDirecta(current.itemId!),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.warning,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  padding: const EdgeInsets.symmetric(
+                    vertical: AppSpacing.buttonV,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                  ),
+                ),
+                icon: const FaIcon(AppIcons.doorExit, size: 14),
+                label: Text(
+                  'Sí, registrar salida',
+                  style: AppTextStyles.button,
+                ),
+              ),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+
+            // Botón cancelar.
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton(
+                onPressed: () {
+                  ref.read(escaneoViewModelProvider.notifier).clearResult();
+                  Navigator.pop(context);
+                },
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.textContrast,
+                  side: const BorderSide(color: AppColors.borderGray),
+                  padding: const EdgeInsets.symmetric(
+                    vertical: AppSpacing.buttonV,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                  ),
+                ),
+                child: Text(
+                  'Cancelar',
+                  style: AppTextStyles.button.copyWith(
+                    color: AppColors.textContrast,
+                  ),
+                ),
+              ),
+            ),
           ],
         ),
       ),
@@ -1267,13 +1410,43 @@ class _ModoCodigoState extends ConsumerState<_ModoCodigo> {
 
 /// Tab que lista todas las visitas activas del día para el Guardia.
 /// Permite registrar entrada/salida directamente (útil para espontáneas).
-class _TabVisitasActivas extends ConsumerWidget {
+/// Valida la ventana de horario antes de registrar una entrada; si la
+/// visita está vencida ofrece el flujo de extensión al anfitrión.
+class _TabVisitasActivas extends ConsumerStatefulWidget {
   const _TabVisitasActivas();
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_TabVisitasActivas> createState() => _TabVisitasActivasState();
+}
+
+class _TabVisitasActivasState extends ConsumerState<_TabVisitasActivas> {
+  @override
+  Widget build(BuildContext context) {
     final vm = ref.watch(guardiaVisitasViewModelProvider);
     final notifier = ref.read(guardiaVisitasViewModelProvider.notifier);
+
+    // ── Reaccionar a errores de horario ──────────────────────────────────
+    ref.listen<GuardiaVisitasState>(guardiaVisitasViewModelProvider,
+        (prev, next) {
+      if (next.timeError != null && prev?.timeError == null) {
+        final err = next.timeError!;
+        notifier.clearTimeError();
+
+        if (err.canExtend) {
+          _showVencidaDialog(context, err);
+        } else {
+          // Demasiado temprano — solo informar.
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(err.message),
+              backgroundColor: AppColors.warning,
+              behavior: SnackBarBehavior.floating,
+              duration: const Duration(seconds: 4),
+            ),
+          );
+        }
+      }
+    });
 
     if (vm.isLoading) {
       return const Center(child: CircularProgressIndicator());
@@ -1286,9 +1459,17 @@ class _TabVisitasActivas extends ConsumerWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const FaIcon(AppIcons.circleXmark, size: 40, color: AppColors.error),
+              const FaIcon(
+                AppIcons.circleXmark,
+                size: 40,
+                color: AppColors.error,
+              ),
               const SizedBox(height: AppSpacing.md),
-              Text(vm.errorMsg, style: AppTextStyles.body, textAlign: TextAlign.center),
+              Text(
+                vm.errorMsg,
+                style: AppTextStyles.body,
+                textAlign: TextAlign.center,
+              ),
               const SizedBox(height: AppSpacing.blockGap),
               ElevatedButton.icon(
                 onPressed: notifier.refresh,
@@ -1330,11 +1511,15 @@ class _TabVisitasActivas extends ConsumerWidget {
               child: Row(
                 children: [
                   Expanded(
-                    child: Text('Visitas del día', style: AppTextStyles.subtitle),
+                    child: Text(
+                      'Visitas del día',
+                      style: AppTextStyles.subtitle,
+                    ),
                   ),
                   Container(
                     padding: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.sm, vertical: 2,
+                      horizontal: AppSpacing.sm,
+                      vertical: 2,
                     ),
                     decoration: BoxDecoration(
                       color: AppColors.primary.withValues(alpha: 0.1),
@@ -1360,17 +1545,130 @@ class _TabVisitasActivas extends ConsumerWidget {
           return _VisitaGuardiaCard(
             dto: dto,
             isProcessing: isProcessing,
+            // Entrada: solo si el visitante aún no ha registrado ningún evento.
             onEntrada: event == null
                 ? () => notifier.registrarEntrada(itemId)
                 : null,
-            onSalida: (event != null &&
-                    event != AccessEventType.salidaInstitucion)
+            // Salida del instituto: solo cuando el anfitrión confirmó que el
+            // visitante ya salió de su oficina (salidaOficina).
+            // Si el visitante está en entradaInstitucion, llegadaOficina o
+            // aún en enEspera, el guardia no puede registrar la salida aún.
+            onSalida: event == AccessEventType.salidaOficina
                 ? () => notifier.registrarSalida(itemId)
                 : null,
           );
         },
       ),
     );
+  }
+
+  // ── Diálogo: visita vencida ─────────────────────────────────────────────
+
+  void _showVencidaDialog(BuildContext ctx, TimeError err) {
+    final dto = err.dto;
+    showDialog<void>(
+      context: ctx,
+      builder: (dCtx) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppSpacing.radiusCard),
+        ),
+        title: Row(
+          children: [
+            const FaIcon(
+              FontAwesomeIcons.clockRotateLeft,
+              size: 18,
+              color: AppColors.warning,
+            ),
+            const SizedBox(width: AppSpacing.sm),
+            const Text('Visita vencida'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(dto.visitor.fullName, style: AppTextStyles.bodyBold),
+            const SizedBox(height: AppSpacing.xs),
+            Row(
+              children: [
+                const FaIcon(
+                  AppIcons.clock,
+                  size: 12,
+                  color: AppColors.iconGray,
+                ),
+                const SizedBox(width: AppSpacing.xs),
+                Text(
+                  'Programada: ${dto.formattedTime}'
+                  '${dto.toleranceMinutes != null ? ' ±${dto.toleranceMinutes}min' : ''}',
+                  style: AppTextStyles.caption,
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            Text(
+              'El tiempo de tolerancia ha expirado. '
+              'Puedes notificar al anfitrión para que autorice la entrada.',
+              style: AppTextStyles.caption,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dCtx),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.warning,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+              ),
+            ),
+            icon: const FaIcon(FontAwesomeIcons.bell, size: 13),
+            label: const Text('Notificar al anfitrión'),
+            onPressed: () {
+              Navigator.pop(dCtx);
+              _solicitarExtension(ctx, dto);
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Inicia el flujo de extensión y muestra el sheet de espera.
+  void _solicitarExtension(BuildContext ctx, ActiveVisitDto dto) {
+    // Disparar el flujo en el escaneo ViewModel (reutiliza countdown + polling).
+    ref.read(escaneoViewModelProvider.notifier).solicitarExtension(
+          requestId: dto.item.requestId,
+          itemId: dto.item.itemId!,
+          visitorName: dto.visitor.fullName,
+          accessToken: dto.item.accessToken,
+        );
+
+    // Mostrar el mismo BottomSheet de extensión que usa el tab QR.
+    showModalBottomSheet<void>(
+      context: ctx,
+      isDismissible: false,
+      enableDrag: false,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => _ScanResultSheet(
+        result: ScanResult.extensionPendiente(
+          visitorName: dto.visitor.fullName,
+          requestId: dto.item.requestId,
+          itemId: dto.item.itemId!,
+          secondsRemaining: 60,
+        ),
+      ),
+    ).then((_) {
+      // Cuando el sheet se cierra, refrescar la lista de visitas.
+      ref.read(escaneoViewModelProvider.notifier).clearResult();
+      ref.read(guardiaVisitasViewModelProvider.notifier).refresh();
+    });
   }
 }
 

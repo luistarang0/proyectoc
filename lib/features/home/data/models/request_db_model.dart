@@ -131,17 +131,18 @@ class RequestDbModel {
   }
 
   /// Mapa para INSERT (sin request_id — AUTO_INCREMENT).
+  /// Todos los campos siempre presentes: mysql_client requiere que cada
+  /// parámetro nombrado en el SQL exista en el mapa, aunque sea null.
   Map<String, dynamic> toInsertMap() => {
     'Email_Host': emailHost,
     'autorizador_id': autorizadorId,
     'building_id': buildingId,
     'visit_type': visitType.dbValue,
-    if (scheduledDate != null)
-      'scheduled_date': scheduledDate!.toIso8601String().substring(0, 10),
-    if (scheduledTime != null) 'scheduled_time': scheduledTime,
-    if (toleranceMinutes != null) 'tolerance_minutes': toleranceMinutes,
+    'scheduled_date': scheduledDate?.toIso8601String().substring(0, 10),
+    'scheduled_time': scheduledTime,
+    'tolerance_minutes': toleranceMinutes,
     'status': status.dbValue,
-    if (groupName != null) 'group_name': groupName,
+    'group_name': groupName,
   };
 
   RequestDbModel copyWith({RequestStatus? status, bool? extensionPending}) =>

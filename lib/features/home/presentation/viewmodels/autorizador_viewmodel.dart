@@ -5,10 +5,12 @@
 ///   autenticado y gestiona las acciones de aprobar y rechazar.
 ///   Referencia: RF-17 del Proyecto C — Control de Accesos.
 /// @author: Luis Antonio Tarango Regis
-/// @version: 1.0.0
-/// @last_update: 2026-05-26
+/// @version: 1.1.0
+/// @last_update: 2026-05-28
 
 library;
+
+import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -28,7 +30,7 @@ class AutorizadorState {
     this.approved = const [],
     this.rejected = const [],
     this.isLoading = false,
-    this.isProcessing = false,
+    this.processingRequestId,
     this.errorMsg = '',
   });
 
@@ -44,19 +46,25 @@ class AutorizadorState {
   /// True mientras se cargan los datos del servidor.
   final bool isLoading;
 
-  /// True mientras se procesa un aprobar/rechazar.
-  final bool isProcessing;
+  /// ID de la solicitud que se está procesando actualmente (aprobar/rechazar).
+  /// Null cuando no hay ninguna en proceso. Permite deshabilitar SOLO la
+  /// tarjeta en proceso y no toda la lista.
+  final int? processingRequestId;
 
   final String errorMsg;
 
   bool get hasError => errorMsg.isNotEmpty;
+
+  /// True si la solicitud [requestId] está siendo procesada en este momento.
+  bool isProcessingFor(int requestId) => processingRequestId == requestId;
 
   AutorizadorState copyWith({
     List<RequestSummaryDto>? pending,
     List<RequestSummaryDto>? approved,
     List<RequestSummaryDto>? rejected,
     bool? isLoading,
-    bool? isProcessing,
+    int? processingRequestId,
+    bool clearProcessing = false,
     String? errorMsg,
   }) {
     return AutorizadorState(
@@ -64,7 +72,9 @@ class AutorizadorState {
       approved: approved ?? this.approved,
       rejected: rejected ?? this.rejected,
       isLoading: isLoading ?? this.isLoading,
-      isProcessing: isProcessing ?? this.isProcessing,
+      processingRequestId: clearProcessing
+          ? null
+          : (processingRequestId ?? this.processingRequestId),
       errorMsg: errorMsg ?? this.errorMsg,
     );
   }
@@ -79,11 +89,17 @@ class AutorizadorState {
 /// obtenerDatosMaster), se muestra un error descriptivo.
 class AutorizadorViewModel extends Notifier<AutorizadorState> {
   late final RequestRepository _requestRepo;
+  Timer? _pollTimer;
 
   @override
   AutorizadorState build() {
     _requestRepo = ref.read(requestRepositoryProvider);
     Future.microtask(_loadAll);
+
+    // Polling cada 10 s para detectar nuevas solicitudes en tiempo real.
+    _pollTimer = Timer.periodic(const Duration(seconds: 10), (_) => _loadAll());
+    ref.onDispose(() => _pollTimer?.cancel());
+
     return const AutorizadorState(isLoading: true);
   }
 
@@ -96,25 +112,40 @@ class AutorizadorViewModel extends Notifier<AutorizadorState> {
     if (session == null) {
       state = state.copyWith(
         isLoading: false,
-        errorMsg: 'Sesión no disponible.',
+        errorMsg: 'Sesión no disponible. Cierra sesión e inicia de nuevo.',
       );
       return;
     }
 
     if (session.empleadoSamId == null) {
+      debugPrint(
+        '[AutorizadorVM] empleadoSamId es null | correo: ${session.correo} | '
+        'credenciales: ${session.credenciales}',
+      );
       state = state.copyWith(
         isLoading: false,
         errorMsg:
-            'No se pudo identificar tu ID de empleado en SAM. '
-            'Cierra sesión e intenta de nuevo.',
+            'No se pudo identificar tu ID en SAM.\n'
+            'Cierra sesión e inicia de nuevo para actualizar la sesión.',
       );
       return;
     }
 
-    state = state.copyWith(isLoading: true, errorMsg: '');
+    // Primera carga: mostrar spinner. Polls silenciosos: no interrumpir la UI.
+    final isFirstLoad = state.pending.isEmpty &&
+        state.approved.isEmpty &&
+        state.rejected.isEmpty &&
+        !state.hasError;
+    if (isFirstLoad) state = state.copyWith(isLoading: true, errorMsg: '');
 
     try {
+      // Rechazar solicitudes vencidas antes de cargar el panel.
+      await _autoRejectIfNeeded();
+
       final autorizadorId = session.empleadoSamId.toString();
+      debugPrint(
+        '[AutorizadorVM] cargando con autorizador_id="$autorizadorId"',
+      );
 
       final results = await Future.wait([
         _requestRepo.findPendingWithDetails(autorizadorId),
@@ -124,6 +155,7 @@ class AutorizadorViewModel extends Notifier<AutorizadorState> {
       final history = results[1];
       state = state.copyWith(
         isLoading: false,
+        clearProcessing: true, // libera bloqueo tras recarga
         pending: results[0],
         approved: history
             .where((r) => r.status == RequestStatus.aprobada)
@@ -134,10 +166,12 @@ class AutorizadorViewModel extends Notifier<AutorizadorState> {
       );
     } catch (e) {
       debugPrint('[AutorizadorVM] Error cargando solicitudes: $e');
-      state = state.copyWith(
-        isLoading: false,
-        errorMsg: 'Error al cargar solicitudes. Intenta de nuevo.',
-      );
+      if (isFirstLoad) {
+        state = state.copyWith(
+          isLoading: false,
+          errorMsg: 'Error al cargar solicitudes. Intenta de nuevo.',
+        );
+      }
     }
   }
 
@@ -153,20 +187,34 @@ class AutorizadorViewModel extends Notifier<AutorizadorState> {
     await _updateStatus(requestId, RequestStatus.rechazada);
   }
 
-  /// Recarga manualmente el panel (pull-to-refresh).
+  /// Recarga manualmente el panel.
   Future<void> refresh() async => _loadAll();
+
+  // ── Cierre automático ─────────────────────────────────────────────────────
+
+  Future<void> _autoRejectIfNeeded() async {
+    try {
+      await _requestRepo.autoRejectExpired();
+      if (DateTime.now().hour >= 21) {
+        await _requestRepo.autoRejectAllPending();
+      }
+    } catch (e) {
+      debugPrint('[AutorizadorVM] autoReject error: $e');
+    }
+  }
 
   // ── Helpers privados ──────────────────────────────────────────────────────
 
   Future<void> _updateStatus(int requestId, RequestStatus status) async {
-    state = state.copyWith(isProcessing: true, errorMsg: '');
+    // Solo bloquea la tarjeta de ESTA solicitud, no las demás.
+    state = state.copyWith(processingRequestId: requestId, errorMsg: '');
     try {
       await _requestRepo.updateStatus(requestId, status);
-      await _loadAll();
+      await _loadAll(); // clearProcessing: true dentro de _loadAll
     } catch (e) {
       debugPrint('[AutorizadorVM] Error actualizando solicitud $requestId: $e');
       state = state.copyWith(
-        isProcessing: false,
+        clearProcessing: true,
         errorMsg: 'Error al procesar la solicitud. Intenta de nuevo.',
       );
     }

@@ -13,6 +13,7 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -22,6 +23,7 @@ import '../../../../core/config/app_colors.dart';
 import '../../../../core/config/app_icons.dart';
 import '../../../../core/config/app_spacing.dart';
 import '../../../../core/config/app_text_styles.dart';
+import '../../../../core/services/session_storage_service.dart';
 import '../../../../core/widgets/app_text_field.dart';
 import '../../../../core/widgets/primary_button.dart';
 import '../../model/guardia_session.dart';
@@ -531,6 +533,12 @@ class _GuardiaLoginFormState extends ConsumerState<_GuardiaLoginForm> {
       setState(() => _errorMsg = 'Ingresa tu número de teléfono');
       return;
     }
+    // Validación básica: exactamente 10 dígitos.
+    final digits = input.replaceAll(RegExp(r'\D'), '');
+    if (digits.length != 10) {
+      setState(() => _errorMsg = 'El número debe tener exactamente 10 dígitos');
+      return;
+    }
 
     setState(() {
       _isLoading = true;
@@ -538,36 +546,67 @@ class _GuardiaLoginFormState extends ConsumerState<_GuardiaLoginForm> {
     });
 
     try {
+      // 1. Solicitar permiso de lectura del SIM.
       final granted = await _requestPhonePermission();
-
-      // sim_card_info v1.0.2 — intentamos leer la info del SIM.
-      // phoneNumber no está disponible en esta versión; modo dummy:
-      // si podemos leer el SIM → válido, si no → acceso concedido.
-      bool canAccess = true;
-      if (granted) {
-        try {
-          final simInfo = SimCardInfo();
-          final cards = await simInfo.getSimInfo();
-          // Si la lectura del SIM falla completamente → dummy = true.
-          // Si hay tarjetas, asumimos que el número ingresado es correcto.
-          canAccess = cards != null;
-        } catch (_) {
-          canAccess = true; // modo dummy
+      if (!granted) {
+        if (mounted) {
+          setState(() =>
+              _errorMsg = 'Se requiere permiso de teléfono para verificar el dispositivo.');
         }
+        return;
+      }
+
+      // 2. Verificar que haya SIM presente (carrier no vacío).
+      bool simPresente = false;
+      try {
+        final cards = await SimCardInfo().getSimInfo();
+        debugPrint('[GuardiaLogin] SIM count: ${cards?.length ?? 'null'}');
+        if (cards != null && cards.isNotEmpty) {
+          simPresente = cards.any((c) => c.carrierName.isNotEmpty);
+          debugPrint('[GuardiaLogin] carrier: "${cards.first.carrierName}"');
+        }
+      } catch (e) {
+        debugPrint('[GuardiaLogin] SimCardInfo error: $e');
       }
 
       if (!mounted) return;
 
-      if (canAccess) {
-        ref.read(guardiaSessionProvider.notifier).state = GuardiaSession(
-          telefono: input,
-        );
-        Navigator.pushReplacementNamed(context, '/home/guardia');
-      } else {
-        setState(
-          () => _errorMsg = 'No se pudo verificar el dispositivo.',
-        );
+      if (!simPresente) {
+        setState(() =>
+            _errorMsg = 'No se detectó ninguna SIM en este dispositivo.');
+        return;
       }
+
+      // 3. Validar contra la whitelist definida en .env (GUARDIA_PHONES).
+      //    Formato: números de 10 dígitos separados por coma.
+      final rawList = dotenv.env['GUARDIA_PHONES'] ?? '';
+      final whitelist = rawList
+          .split(',')
+          .map((n) => n.trim().replaceAll(RegExp(r'\D'), ''))
+          .where((n) => n.length == 10)
+          .toSet();
+
+      debugPrint('[GuardiaLogin] whitelist : $whitelist');
+      debugPrint('[GuardiaLogin] input     : "$digits"');
+      debugPrint('[GuardiaLogin] autorizado: ${whitelist.contains(digits)}');
+
+      if (whitelist.isEmpty) {
+        setState(() =>
+            _errorMsg = 'No hay guardias configurados. Contacta al administrador.');
+        return;
+      }
+
+      if (!whitelist.contains(digits)) {
+        setState(() =>
+            _errorMsg = 'Este número no está autorizado como guardia.');
+        return;
+      }
+
+      // 4. Acceso concedido.
+      final guardiaSession = GuardiaSession(telefono: digits);
+      ref.read(guardiaSessionProvider.notifier).state = guardiaSession;
+      SessionStorageService.saveGuardiaSession(guardiaSession).ignore();
+      Navigator.pushReplacementNamed(context, '/home/guardia');
     } catch (e) {
       if (mounted) {
         setState(() => _errorMsg = 'Error al verificar. Intenta de nuevo.');
