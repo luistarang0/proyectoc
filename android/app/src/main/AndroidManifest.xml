@@ -6,7 +6,7 @@
     <uses-permission android:name="android.permission.READ_PHONE_NUMBERS"/>
 
     <application
-        android:label="pr_c"
+        android:label="Contro De Accesos Tec"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:usesCleartextTraffic="true">

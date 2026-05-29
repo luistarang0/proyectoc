@@ -51,7 +51,8 @@ class LoginState {
   final String errorMsg;
 
   bool get isLoading => status == AuthStatus.loading;
-  bool get isCaptchaLoading => status == AuthStatus.loading && captchaImage == null;
+  bool get isCaptchaLoading =>
+      status == AuthStatus.loading && captchaImage == null;
 
   LoginState copyWith({
     String? username,
@@ -78,7 +79,6 @@ class LoginState {
 ///
 /// Gestiona el estado del formulario, el CAPTCHA y la autenticación
 /// contra el web service SAM a través del [AuthRepository].
-/// Referencia: RF-15 / RF-16 del Manual de Proyecto C.
 class LoginViewModel extends Notifier<LoginState> {
   late final AuthRepository _repository;
 
@@ -111,7 +111,6 @@ class LoginViewModel extends Notifier<LoginState> {
 
   String? validatePassword(String? v) {
     if (v == null || v.isEmpty) return 'Ingresa tu contraseña';
-    if (v.length < 4) return 'Mínimo 4 caracteres';
     return null;
   }
 
@@ -188,10 +187,7 @@ class LoginViewModel extends Notifier<LoginState> {
       state = state.copyWith(status: AuthStatus.success);
       _navigateByRole(result.role, context);
     } on SamAuthException catch (e) {
-      state = state.copyWith(
-        status: AuthStatus.error,
-        errorMsg: e.message,
-      );
+      state = state.copyWith(status: AuthStatus.error, errorMsg: e.message);
       // Refrescar CAPTCHA automáticamente tras error de login.
       await fetchCaptcha();
     } catch (_) {
@@ -226,5 +222,6 @@ class LoginViewModel extends Notifier<LoginState> {
 // ── Provider ──────────────────────────────────────────────────────────────────
 
 /// Provider del [LoginViewModel] para inyección de dependencias con Riverpod.
-final loginViewModelProvider =
-    NotifierProvider<LoginViewModel, LoginState>(LoginViewModel.new);
+final loginViewModelProvider = NotifierProvider<LoginViewModel, LoginState>(
+  LoginViewModel.new,
+);

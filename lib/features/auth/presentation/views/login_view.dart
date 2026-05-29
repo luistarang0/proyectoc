@@ -171,91 +171,124 @@ class _LoginViewState extends ConsumerState<LoginView>
 // Header institucional
 // ═════════════════════════════════════════════════════════════════════════════
 
+/// Header del login con los logos institucionales reales.
+///
+/// Layout:
+///   ┌───────────────────────────────────────────────────┐
+///   │  fondo azul oscuro (AppColors.primary)            │
+///   │  [tec.png]   [logo.png — grande, centro]  [ittol] │
+///   └───────────────────────────────────────────────────┘
+///   ┌───────────────────────────────────────────────────┐
+///   │  fondo iceBlue                                     │
+///   │  "Control de Accesos"   (título)                  │
+///   │  "Instituto Tecnológico de Toluca"  (subtítulo)   │
+///   └───────────────────────────────────────────────────┘
 class _InstitutionalHeader extends StatelessWidget {
   const _InstitutionalHeader();
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      color: AppColors.iceBlue,
-      padding: const EdgeInsets.fromLTRB(
-        AppSpacing.screenH,
-        AppSpacing.blockGap,
-        AppSpacing.screenH,
-        AppSpacing.lg,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
+    return Column(
+      children: [
+        // ── Banda de logos ────────────────────────────────
+        Container(
+          width: double.infinity,
+          color: AppColors.primary,
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.screenH,
+            vertical: AppSpacing.md,
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              _LogoBadge(
-                icon: AppIcons.gear,
-                label: 'TECNM',
-                color: AppColors.primary,
+              // Logo TECNM (tec.png — fondo blanco propio)
+              Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                ),
+                padding: const EdgeInsets.all(4),
+                child: Image.asset(
+                  'assets/tec.png',
+                  fit: BoxFit.contain,
+                ),
               ),
-              const SizedBox(width: AppSpacing.md),
-              Container(width: 1, height: 52, color: AppColors.borderGray),
-              const SizedBox(width: AppSpacing.md),
-              _LogoBadge(
-                icon: FontAwesomeIcons.buildingColumns,
-                label: 'ITT',
-                color: AppColors.secondary,
-                filled: true,
+
+              // Logo del sistema — centro, más grande
+              Container(
+                width: 88,
+                height: 88,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.25),
+                      blurRadius: 8,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
+                ),
+                padding: const EdgeInsets.all(4),
+                child: ClipOval(
+                  child: Image.asset(
+                    'assets/logo.png',
+                    fit: BoxFit.contain,
+                  ),
+                ),
+              ),
+
+              // Logo ITT Toluca (ittol.png — fondo transparente)
+              Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                ),
+                padding: const EdgeInsets.all(4),
+                child: Image.asset(
+                  'assets/ittol.png',
+                  fit: BoxFit.contain,
+                ),
               ),
             ],
           ),
-          const SizedBox(height: AppSpacing.md),
-          Text(
-            'Control de Accesos',
-            style: AppTextStyles.title,
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: AppSpacing.xs),
-          Text(
-            'Proyecto C · GAMA Móvil',
-            style: AppTextStyles.caption,
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
-    );
-  }
-}
+        ),
 
-class _LogoBadge extends StatelessWidget {
-  const _LogoBadge({
-    required this.icon,
-    required this.label,
-    required this.color,
-    this.filled = false,
-  });
-
-  final IconData icon;
-  final String label;
-  final Color color;
-  final bool filled;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
+        // ── Banda de nombre del sistema ───────────────────
         Container(
-          width: 56,
-          height: 56,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: filled ? color : AppColors.mistBlue,
-            border: Border.all(color: color, width: 1.5),
+          width: double.infinity,
+          color: AppColors.iceBlue,
+          padding: const EdgeInsets.symmetric(
+            vertical: AppSpacing.md,
+            horizontal: AppSpacing.screenH,
           ),
-          child: Center(
-            child: FaIcon(icon, size: 24, color: filled ? Colors.white : color),
+          child: Column(
+            children: [
+              Text(
+                'Control de Accesos',
+                style: AppTextStyles.title.copyWith(
+                  color: AppColors.primary,
+                  letterSpacing: 0.3,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 2),
+              Text(
+                'Instituto Tecnológico de Toluca',
+                style: AppTextStyles.caption.copyWith(
+                  color: AppColors.secondary,
+                  fontWeight: FontWeight.w600,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
           ),
         ),
-        const SizedBox(height: 4),
-        Text(label, style: AppTextStyles.captionBold.copyWith(color: color)),
       ],
     );
   }
